@@ -35,7 +35,8 @@ See [images and videos](#images-and-videos-in-messages) for previewing and savin
 ## Send while the agent is working
 
 On web and desktop, a message sent during a running turn goes to the agent right
-away and joins the work in progress.
+away and joins the work in progress. While a queued message is still due to go
+out on its own, a new message lines up behind it.
 
 In **Settings → General → Follow-up behavior**, choose **Queue** to hold these
 messages instead. A queued message waits at the end of the conversation as a
