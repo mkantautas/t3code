@@ -321,6 +321,15 @@ describe("provider update launch notification logic", () => {
     ).toBe(
       "Cursor can be updated from provider settings. Update Codex with the app or tool that installed it.",
     );
+    const oneClick = updateCandidate({ driver: driver("claudeAgent") });
+    expect(
+      getProviderUpdateInitialToastView({
+        updateProviders: [oneClick, updateCandidate({ driver: driver("codex"), ...manual })],
+        oneClickProviders: [oneClick],
+      }).description,
+    ).toBe(
+      "Install the update now or review provider settings. Update Codex with the app or tool that installed it.",
+    );
   });
 
   it("uses server update state for running progress", () => {

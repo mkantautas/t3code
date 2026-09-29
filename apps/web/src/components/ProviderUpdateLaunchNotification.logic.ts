@@ -235,16 +235,24 @@ function formatProviderList(providers: ReadonlyArray<Pick<ServerProvider, "drive
 }
 
 /**
- * Provider settings has an Update button only for installs the server can
- * update. The rest are updated by the app or tool that installed them.
+ * Install and provider settings reach only installs the server can update.
+ * The rest are updated by the app or tool that installed them, so they get
+ * their own sentence whatever else the notice offers.
  */
-function describeUpdatesWithoutOneClick(providers: ReadonlyArray<ProviderUpdateCandidate>): string {
-  const fromSettings = providers.filter((provider) => provider.versionAdvisory.canUpdate);
-  const manual = providers.filter((provider) => !provider.versionAdvisory.canUpdate);
+function describeInitialUpdates(input: {
+  readonly updateProviders: ReadonlyArray<ProviderUpdateCandidate>;
+  readonly oneClickProviders: ReadonlyArray<ProviderUpdateCandidate>;
+}): string {
+  const fromSettings = input.updateProviders.filter(
+    (provider) => provider.versionAdvisory.canUpdate,
+  );
+  const manual = input.updateProviders.filter((provider) => !provider.versionAdvisory.canUpdate);
   return [
-    fromSettings.length > 0
-      ? `${formatProviderList(fromSettings)} can be updated from provider settings.`
-      : null,
+    input.oneClickProviders.length > 0
+      ? "Install the update now or review provider settings."
+      : fromSettings.length > 0
+        ? `${formatProviderList(fromSettings)} can be updated from provider settings.`
+        : null,
     manual.length > 0
       ? `Update ${formatProviderList(manual)} with the app or tool that installed ${manual.length === 1 ? "it" : "them"}.`
       : null,
@@ -261,10 +269,7 @@ export function getProviderUpdateInitialToastView(input: {
     phase: "initial",
     type: "warning",
     title: getProviderUpdateInitialToastTitle(input.updateProviders),
-    description:
-      input.oneClickProviders.length > 0
-        ? "Install the update now or review provider settings."
-        : describeUpdatesWithoutOneClick(input.updateProviders),
+    description: describeInitialUpdates(input),
   };
 }
 
