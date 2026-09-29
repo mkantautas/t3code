@@ -234,6 +234,25 @@ function formatProviderList(providers: ReadonlyArray<Pick<ServerProvider, "drive
   return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
 }
 
+/**
+ * Provider settings has an Update button only for installs the server can
+ * update. The rest are updated by the app or tool that installed them.
+ */
+function describeUpdatesWithoutOneClick(providers: ReadonlyArray<ProviderUpdateCandidate>): string {
+  const fromSettings = providers.filter((provider) => provider.versionAdvisory.canUpdate);
+  const manual = providers.filter((provider) => !provider.versionAdvisory.canUpdate);
+  return [
+    fromSettings.length > 0
+      ? `${formatProviderList(fromSettings)} can be updated from provider settings.`
+      : null,
+    manual.length > 0
+      ? `Update ${formatProviderList(manual)} with the app or tool that installed ${manual.length === 1 ? "it" : "them"}.`
+      : null,
+  ]
+    .filter((sentence) => sentence !== null)
+    .join(" ");
+}
+
 export function getProviderUpdateInitialToastView(input: {
   readonly updateProviders: ReadonlyArray<ProviderUpdateCandidate>;
   readonly oneClickProviders: ReadonlyArray<ProviderUpdateCandidate>;
@@ -245,7 +264,7 @@ export function getProviderUpdateInitialToastView(input: {
     description:
       input.oneClickProviders.length > 0
         ? "Install the update now or review provider settings."
-        : `${formatProviderList(input.updateProviders)} can be updated from provider settings.`,
+        : describeUpdatesWithoutOneClick(input.updateProviders),
   };
 }
 
