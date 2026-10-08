@@ -235,6 +235,27 @@ describe("buildThreadTitlePrompt", () => {
     expect(result.prompt).toContain("The remaining issue is stale session state");
   });
 
+  it.each([undefined, "Old title"])(
+    "appends the user's title instructions (previous title: %s)",
+    (previousTitle) => {
+      const result = buildThreadTitlePrompt({
+        message: "Check ticket ABC-12",
+        previousTitle,
+        instructions: "Start with the ticket key, such as ABC-12.",
+      });
+
+      expect(result.prompt).toContain(
+        "The user's title instructions, which take precedence over the editorial rules above:\nStart with the ticket key, such as ABC-12.",
+      );
+    },
+  );
+
+  it("omits the instructions section when none are set", () => {
+    expect(buildThreadTitlePrompt({ message: "Fix login", instructions: "" }).prompt).not.toContain(
+      "title instructions",
+    );
+  });
+
   it("keeps the latest thread contents when regeneration context is truncated", () => {
     const result = buildThreadTitlePrompt({
       message: `${"old context ".repeat(1_000)}\n\nASSISTANT:\nCurrent thread state`,

@@ -504,6 +504,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["generated thread titles source control content default provider"],
   },
   {
+    id: "thread-title-instructions",
+    title: "Thread title instructions",
+    to: "/settings/general",
+    scope: "project-defaults",
+    searchTerms: ["generated thread names naming prompt custom issue ticket key prefix"],
+  },
+  {
     id: "cli-command",
     title: "t3 command",
     to: "/settings/general",

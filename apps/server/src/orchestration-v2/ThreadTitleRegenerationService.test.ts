@@ -45,6 +45,7 @@ const adapter = {
 function makeHarness(
   options: {
     readonly generateTitle?: TextGeneration.TextGeneration["Service"]["generateThreadTitle"];
+    readonly settings?: Parameters<typeof ServerSettings.layerTest>[0];
   } = {},
 ) {
   const layerDatabase = SqlitePersistence.layerMemory;
@@ -86,7 +87,7 @@ function makeHarness(
         layerThreadManagement,
         layerProjectedProjects,
         Layer.mock(TextGeneration.TextGeneration)({ generateThreadTitle }),
-        ServerSettings.layerTest({}),
+        ServerSettings.layerTest(options.settings),
       ),
     ),
   );
@@ -324,6 +325,42 @@ describe("ThreadTitleRegenerationService", () => {
         const projection = yield* threads.getThreadProjection(threadId);
         assert.equal(projection.thread.title, "Fresh title");
         assert.isNotOk(projection.thread.titleRegeneration);
+      }).pipe(Effect.provide(harness.layer));
+    }),
+  );
+
+  it.effect("passes the project's title instructions to generation", () =>
+    Effect.gen(function* () {
+      const harness = makeHarness({
+        settings: {
+          threadTitleInstructions: "Use sentence case.",
+          projectSettingsOverrides: {
+            [projectId]: { threadTitleInstructions: "Start with the ticket key, such as ABC-12." },
+          },
+        },
+      });
+      yield* Effect.gen(function* () {
+        const titleRegeneration = yield* ThreadTitleRegeneration.ThreadTitleRegenerationService;
+        const threadId = yield* createThread({
+          command: "command:title:instructions:create",
+          thread: "thread:title:instructions",
+        });
+        yield* dispatchUserMessage({
+          command: "command:title:instructions:message",
+          threadId,
+          text: "Check ticket ABC-12",
+        });
+        const requestId = yield* armRegeneration({
+          command: "command:title:instructions:1",
+          threadId,
+        });
+
+        yield* titleRegeneration.execute({ threadId, requestId, kind: { type: "regenerate" } });
+
+        assert.equal(
+          harness.generateThreadTitle.mock.calls[0]?.[0]?.instructions,
+          "Start with the ticket key, such as ABC-12.",
+        );
       }).pipe(Effect.provide(harness.layer));
     }),
   );
