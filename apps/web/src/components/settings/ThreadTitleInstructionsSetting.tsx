@@ -1,8 +1,7 @@
-import { useRef } from "react";
+import { useState } from "react";
 
 import { Textarea } from "../ui/textarea";
 import { SettingsRow, SettingResetButton } from "./settingsLayout";
-import { useSettingsScope } from "./SettingsScopeContext";
 import { searchableSetting } from "./settingsSearch";
 import {
   useScopedSettings,
@@ -12,11 +11,12 @@ import {
 
 export function ThreadTitleInstructionsSetting() {
   const settings = useScopedSettings();
-  const { targets } = useSettingsScope();
-  const scopeKey = targets.map((target) => `${target.environmentId}:${target.projectId}`).join(",");
-  const edited = useRef(false);
   const updateSettings = useUpdateScopedSettings();
   const mixed = useScopedSettingsMixed(["threadTitleInstructions"]);
+  const value = mixed ? "" : settings.threadTitleInstructions;
+  // Holds the text only while the field is focused, so a settings push from
+  // another client or a scope change never replaces an edit in progress.
+  const [draft, setDraft] = useState<string | null>(null);
 
   return (
     <SettingsRow
@@ -35,23 +35,20 @@ export function ThreadTitleInstructionsSetting() {
     >
       <div className="mt-3 max-w-2xl pb-3.5">
         <Textarea
-          key={`${scopeKey}:${mixed}:${settings.threadTitleInstructions}`}
           aria-label="Thread title instructions"
-          onChange={() => {
-            edited.current = true;
-          }}
           rows={3}
-          defaultValue={mixed ? "" : settings.threadTitleInstructions}
+          value={draft ?? value}
           placeholder={
             mixed
               ? "Mixed. Enter instructions to apply to all selected targets."
               : "Start with the issue key when the message names one, such as ABC-123 Fix login timeout."
           }
-          onBlur={(event) => {
-            const value = event.target.value.trim();
-            if (edited.current && (mixed || value !== settings.threadTitleInstructions))
-              updateSettings({ threadTitleInstructions: value });
-            edited.current = false;
+          onFocus={() => setDraft(value)}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={() => {
+            const next = (draft ?? value).trim();
+            setDraft(null);
+            if (next !== value) updateSettings({ threadTitleInstructions: next });
           }}
         />
       </div>

@@ -54,11 +54,11 @@ branch name remains.
 
 ## Thread titles
 
-In **Settings → General → Thread title instructions**, tell the model how to name
-threads, for example `Start with the issue key when the message names one, such as
-ABC-123 Fix login timeout.` The instructions apply to new threads and to regenerated
-titles, and take precedence over T3 Code's own title rules. Select a project to give it
-its own instructions.
+On web or desktop, use **Settings → General → Thread title instructions** to tell the
+model how to name threads, for example `Start with the issue key when the message names
+one, such as ABC-123 Fix login timeout.` The instructions apply to new threads and to
+regenerated titles, including threads started from mobile, and take precedence over
+T3 Code's own title rules. Select a project to give it its own instructions.
 
 ## Scheduled tasks on mobile
 
