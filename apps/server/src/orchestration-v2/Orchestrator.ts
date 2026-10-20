@@ -655,11 +655,20 @@ function nextQueuedRun(
   return queuedRunsInDeliveryOrder(projection)[0];
 }
 
+/**
+ * Messages whose sender named the thread rather than a model: app-owned
+ * monitor updates, messages agents send through T3 tools, and bound scheduled
+ * runs. Queued, they run on the agent handling the thread at delivery, so a
+ * switch away from a limited provider takes them along.
+ */
 function followsCurrentConversation(
   message: OrchestrationV2ConversationMessage | undefined,
 ): boolean {
+  if (message === undefined || isBufferedProviderNotification(message)) return false;
   return (
-    message?.notification?.source.kind === "monitor" && !isBufferedProviderNotification(message)
+    message.notification?.source.kind === "monitor" ||
+    (message.createdBy === "agent" && message.creationSource === "mcp") ||
+    message.scheduledTaskId !== undefined
   );
 }
 
@@ -668,7 +677,6 @@ function queuedRunModelSelection(
   run: OrchestrationV2Run,
 ): ModelSelection {
   const message = projection.messages.find((candidate) => candidate.id === run.userMessageId);
-  // App-owned monitor updates follow the agent currently handling the thread.
   return followsCurrentConversation(message)
     ? projection.thread.modelSelection
     : run.modelSelection;

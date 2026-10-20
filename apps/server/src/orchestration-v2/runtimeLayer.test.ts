@@ -5202,6 +5202,162 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
     }),
   );
 
+  it.effect("a switch past a usage limit takes queued agent messages and leaves prompts", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const eventSink = yield* EventSink.EventSinkV2;
+      const threadId = ThreadId.make("runtime-layer-queue-limit-switch-agent");
+      const switchedSelection = { instanceId: alternateInstanceId, model: "gpt-5.5" };
+      yield* orchestrator.dispatch({
+        type: "thread.create",
+        commandId: CommandId.make(`${threadId}:create`),
+        threadId,
+        createdBy: "user",
+        creationSource: "web",
+        projectId: ProjectId.make(`${threadId}:project`),
+        title: "Limit switch",
+        modelSelection,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: process.cwd(),
+      });
+      const send = (
+        name: string,
+        input: {
+          readonly createdBy: "user" | "agent";
+          readonly creationSource: "web" | "mcp";
+          readonly modelSelection?: typeof switchedSelection;
+          readonly dispatchMode: "start_immediately" | "queue_after_active";
+        },
+      ) =>
+        orchestrator.dispatch({
+          type: "message.dispatch",
+          commandId: CommandId.make(`${threadId}:${name}`),
+          threadId,
+          messageId: MessageId.make(`${threadId}:${name}`),
+          text: name,
+          attachments: [],
+          createdBy: input.createdBy,
+          creationSource: input.creationSource,
+          ...(input.creationSource === "mcp"
+            ? { senderThreadId: ThreadId.make(`${threadId}:sender`) }
+            : {}),
+          ...(input.modelSelection === undefined ? {} : { modelSelection: input.modelSelection }),
+          dispatchMode: { type: input.dispatchMode },
+        });
+      yield* send("limited", {
+        createdBy: "user",
+        creationSource: "web",
+        dispatchMode: "start_immediately",
+      });
+      // t3_thread_send names no model, so the run takes the thread's.
+      yield* send("agent", {
+        createdBy: "agent",
+        creationSource: "mcp",
+        dispatchMode: "queue_after_active",
+      });
+      yield* send("prompt", {
+        createdBy: "user",
+        creationSource: "web",
+        dispatchMode: "queue_after_active",
+      });
+      const [limited, agent, prompt] = (yield* orchestrator.getThreadProjection(threadId)).runs;
+      assert.isDefined(limited);
+      assert.isDefined(agent);
+      assert.isDefined(prompt);
+      const now = yield* DateTime.now;
+      yield* eventSink.write({
+        events: [
+          {
+            id: EventId.make(`${threadId}:error`),
+            type: "turn-item.updated",
+            threadId,
+            runId: limited.id,
+            nodeId: limited.rootNodeId!,
+            providerInstanceId: limited.providerInstanceId,
+            occurredAt: now,
+            payload: {
+              id: TurnItemId.make(`${threadId}:error`),
+              type: "error",
+              threadId,
+              runId: limited.id,
+              nodeId: limited.rootNodeId!,
+              providerThreadId: limited.providerThreadId,
+              providerTurnId: null,
+              nativeItemRef: null,
+              parentItemId: null,
+              ordinal: 2,
+              status: "failed",
+              title: "Usage limit",
+              startedAt: now,
+              completedAt: now,
+              updatedAt: now,
+              failure: {
+                class: "usage_limit",
+                message: "Usage limit reached",
+                code: "usage_limit",
+                retryable: null,
+                resetAt: DateTime.formatIso(DateTime.add(now, { hours: 1 })),
+              },
+            },
+          },
+          {
+            id: EventId.make(`${threadId}:failed`),
+            type: "run.updated",
+            threadId,
+            runId: limited.id,
+            providerInstanceId: limited.providerInstanceId,
+            occurredAt: now,
+            payload: { ...limited, status: "failed", completedAt: now },
+          },
+        ],
+      });
+
+      // The user moves the thread to another provider; the message starts
+      // ahead of the held queue and completes there.
+      yield* send("switch", {
+        createdBy: "user",
+        creationSource: "web",
+        modelSelection: switchedSelection,
+        dispatchMode: "start_immediately",
+      });
+      const switched = (yield* orchestrator.getThreadProjection(threadId)).runs.find(
+        (run) => run.userMessageId === MessageId.make(`${threadId}:switch`),
+      );
+      assert.equal(switched?.status, "starting");
+      const complete = (run: NonNullable<typeof switched>, name: string) =>
+        eventSink.write({
+          events: [
+            {
+              id: EventId.make(`${threadId}:${name}:completed`),
+              type: "run.updated",
+              threadId,
+              runId: run.id,
+              providerInstanceId: run.providerInstanceId,
+              occurredAt: now,
+              payload: { ...run, status: "completed", completedAt: now },
+            },
+          ],
+        });
+      yield* complete(switched!, "switch");
+
+      yield* orchestrator.resumeQueuedRuns;
+      const followed = yield* orchestrator.getThreadProjection(threadId);
+      const delivered = followed.runs.find((run) => run.id === agent.id)!;
+      assert.equal(delivered.status, "starting");
+      assert.deepEqual(delivered.modelSelection, switchedSelection);
+      assert.equal(delivered.providerThreadId, switched!.providerThreadId);
+      assert.deepEqual(followed.thread.modelSelection, switchedSelection);
+
+      // The prompt keeps its provider, which stays limited until its reset.
+      yield* complete(delivered, "agent");
+      yield* orchestrator.resumeQueuedRuns;
+      const held = yield* orchestrator.getThreadProjection(threadId);
+      assert.equal(held.runs.find((run) => run.id === prompt.id)?.status, "queued");
+    }),
+  );
+
   it.effect.each([
     ["server", modelSelection],
     ["provider", modelSelection],
