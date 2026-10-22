@@ -1,0 +1,89 @@
+[
+ {
+  "open": "http://<dev-host>:<web-port>/<environment-id>/<thread-id>"
+ },
+ {
+  "wait": 35
+ },
+ {
+  "shot": "start"
+ },
+ {
+  "swipe": "down"
+ },
+ {
+  "wait": 1.5
+ },
+ {
+  "swipe": "down"
+ },
+ {
+  "wait": 1.5
+ },
+ {
+  "swipe": "down"
+ },
+ {
+  "wait": 1.5
+ },
+ {
+  "swipe": "down"
+ },
+ {
+  "wait": 1.5
+ },
+ {
+  "swipe": "down"
+ },
+ {
+  "wait": 1.5
+ },
+ {
+  "swipe": "down"
+ },
+ {
+  "wait": 1.5
+ },
+ {
+  "swipe": "down"
+ },
+ {
+  "wait": 1.5
+ },
+ {
+  "swipe": "down"
+ },
+ {
+  "wait": 1.5
+ },
+ {
+  "swipe": "down"
+ },
+ {
+  "wait": 1.5
+ },
+ {
+  "swipe": "down"
+ },
+ {
+  "wait": 1.5
+ },
+ {
+  "swipe": "down"
+ },
+ {
+  "wait": 1.5
+ },
+ {
+  "swipe": "down"
+ },
+ {
+  "wait": 1.5
+ },
+ {
+  "shot": "end"
+ },
+ {
+  "wait": 1
+ }
+]
