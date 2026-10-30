@@ -14,7 +14,7 @@ import { resolveComposerProviderSelection } from "./components/ChatView.logic";
 import {
   deriveProviderInstanceEntries,
   NO_PROVIDER_MODEL_SELECTION,
-  sortProviderInstanceEntries,
+  providerInstanceEntriesFor,
 } from "./providerInstances";
 import {
   getAppModelOptionsForInstance,
@@ -830,8 +830,21 @@ describe("composer fallback to another instance of the same driver", () => {
     readonly draft?: Parameters<typeof deriveEffectiveComposerModelState>[0]["draft"];
     readonly threadModelSelection: ReturnType<typeof createModelSelection>;
   }) {
+    const settings = {
+      ...DEFAULT_UNIFIED_SETTINGS,
+      providerInstances: Object.fromEntries(
+        input.providers.map((provider) => [
+          provider.instanceId,
+          {
+            driver: provider.driver,
+            enabled: provider.enabled,
+            config: {},
+          },
+        ]),
+      ),
+    };
     const selection = resolveComposerProviderSelection({
-      entries: sortProviderInstanceEntries(deriveProviderInstanceEntries(input.providers)),
+      entries: providerInstanceEntriesFor(input.providers, settings, null),
       candidateInstanceIds: [input.threadModelSelection.instanceId],
       lockedProvider: null,
       lockedInstanceId: undefined,
@@ -846,7 +859,7 @@ describe("composer fallback to another instance of the same driver", () => {
       requestedInstanceId: selection.requestedInstanceId,
       threadModelSelection: input.threadModelSelection,
       projectModelSelection: null,
-      settings: DEFAULT_UNIFIED_SETTINGS,
+      settings,
     });
     const traits = getComposerProviderState({
       provider: selectedProvider,
