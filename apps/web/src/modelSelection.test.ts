@@ -829,6 +829,7 @@ describe("composer fallback to another instance of the same driver", () => {
     readonly providers: ReadonlyArray<ServerProvider>;
     readonly draft?: Parameters<typeof deriveEffectiveComposerModelState>[0]["draft"];
     readonly threadModelSelection: ReturnType<typeof createModelSelection>;
+    readonly customModels?: Partial<Record<string, ReadonlyArray<string>>>;
   }) {
     const settings = {
       ...DEFAULT_UNIFIED_SETTINGS,
@@ -838,7 +839,13 @@ describe("composer fallback to another instance of the same driver", () => {
           {
             driver: provider.driver,
             enabled: provider.enabled,
-            config: {},
+            config: {
+              customModels: (input.customModels?.[provider.instanceId] ?? []).map((slug) => ({
+                slug,
+                name: slug,
+                capabilities: null,
+              })),
+            },
           },
         ]),
       ),
@@ -969,29 +976,42 @@ describe("composer fallback to another instance of the same driver", () => {
       expect(traits.promptEffort).toBe("xhigh");
     });
 
-    it("does not alias-expand a custom model the requested instance offers", () => {
-      // A disabled Codex instance reports only its custom models; this one is named "5.4".
-      const disabledCodex = ProviderInstanceId.make("codex");
-      const { state, traits } = composerFor({
-        providers: [
-          {
-            ...provider({ provider: codex, instanceId: disabledCodex }),
-            enabled: false,
-            models: [reasoningModel("5.4", "reasoningEffort", { isCustom: true })],
-          },
-          {
-            ...provider({ provider: codex, instanceId: "codex_team" }),
-            models: [reasoningModel("gpt-5.4", "reasoningEffort")],
-          },
-        ],
-        threadModelSelection: createModelSelection(disabledCodex, "5.4", [
-          { id: "reasoningEffort", value: "xhigh" },
-        ]),
-      });
+    it.each([
+      {
+        // A disabled Codex instance reports only its custom models.
+        state: "disabled",
+        requested: {
+          enabled: false,
+          models: [reasoningModel("5.4", "reasoningEffort", { isCustom: true })],
+        },
+      },
+      {
+        // An unavailable instance reports no models; its custom models are only in settings.
+        state: "unavailable",
+        requested: { enabled: false, availability: "unavailable" as const, models: [] },
+      },
+    ])(
+      "does not alias-expand a custom model named 5.4 when the requested instance is $state",
+      ({ requested }) => {
+        const disabledCodex = ProviderInstanceId.make("codex");
+        const { state, traits } = composerFor({
+          providers: [
+            { ...provider({ provider: codex, instanceId: disabledCodex }), ...requested },
+            {
+              ...provider({ provider: codex, instanceId: "codex_team" }),
+              models: [reasoningModel("gpt-5.4", "reasoningEffort")],
+            },
+          ],
+          customModels: { [disabledCodex]: ["5.4"] },
+          threadModelSelection: createModelSelection(disabledCodex, "5.4", [
+            { id: "reasoningEffort", value: "xhigh" },
+          ]),
+        });
 
-      expect(state.selectedModel).toBe("gpt-5.4");
-      expect(traits.modelOptionsForDispatch).toBeUndefined();
-    });
+        expect(state.selectedModel).toBe("gpt-5.4");
+        expect(traits.modelOptionsForDispatch).toBeUndefined();
+      },
+    );
 
     it("does not carry options through an alias that names another model per instance", () => {
       // "antigravity-default" is each Antigravity instance's current model.

@@ -53,7 +53,11 @@ import type {
 import { waitForDraftHeroTransition } from "./components/chat/draftHeroTransition";
 import { getLocalStorageItem } from "./hooks/useLocalStorage";
 import { readThreadPreviewState } from "./previewStateStore";
-import { resolveAppModelSelection, resolveAppModelSelectionForInstance } from "./modelSelection";
+import {
+  readInstanceCustomModels,
+  resolveAppModelSelection,
+  resolveAppModelSelectionForInstance,
+} from "./modelSelection";
 import {
   DEFAULT_INTERACTION_MODE,
   DEFAULT_RUNTIME_MODE,
@@ -1188,6 +1192,7 @@ function withFallbackInstanceOptions(input: {
   readonly selectedProvider: ProviderDriverKind;
   readonly selectedInstanceId?: ProviderInstanceId | null | undefined;
   readonly requestedInstanceId?: ProviderInstanceId | null | undefined;
+  readonly settings: UnifiedSettings;
 }): ProviderOptionSelectionsByProvider | null {
   const { modelOptions, selectedInstanceId, requestedInstanceId } = input;
   if (
@@ -1203,14 +1208,18 @@ function withFallbackInstanceOptions(input: {
   const requestedProvider = input.providers.find(
     (provider) => provider.instanceId === requestedInstanceId,
   );
-  // The model of the selection the options came from, which can differ from the shown model's source.
-  // It can be a driver alias such as "5.4" for "gpt-5.4", expanded only when the requested instance
-  // does not offer that exact slug (a custom model can be named "5.4"). Catalog aliases are not used:
-  // Antigravity's "antigravity-default" names a different model on each instance.
+  // A driver alias such as "5.4" expands only when the requested instance does not offer that exact
+  // slug; custom models count, from settings too, since an unavailable instance reports none.
+  // Catalog aliases are not used: Antigravity's "antigravity-default" differs per instance.
   const requestedModel = input.optionSelections?.[requestedInstanceId]?.model;
+  const requestedOffersSlug =
+    requestedProvider?.models.some((model) => model.slug === requestedModel) ||
+    readInstanceCustomModels(input.settings, requestedInstanceId, input.selectedProvider).some(
+      (model) => model.slug === requestedModel,
+    );
   const sameModel =
     requestedModel === input.selectedModel ||
-    (!requestedProvider?.models.some((model) => model.slug === requestedModel) &&
+    (!requestedOffersSlug &&
       normalizeModelSlug(requestedModel, input.selectedProvider) === input.selectedModel);
   if (!requestedOptions || requestedProvider?.driver !== input.selectedProvider || !sameModel) {
     return modelOptions;
