@@ -969,6 +969,30 @@ describe("composer fallback to another instance of the same driver", () => {
       expect(traits.promptEffort).toBe("xhigh");
     });
 
+    it("does not alias-expand a custom model the requested instance offers", () => {
+      // A disabled Codex instance reports only its custom models; this one is named "5.4".
+      const disabledCodex = ProviderInstanceId.make("codex");
+      const { state, traits } = composerFor({
+        providers: [
+          {
+            ...provider({ provider: codex, instanceId: disabledCodex }),
+            enabled: false,
+            models: [reasoningModel("5.4", "reasoningEffort", { isCustom: true })],
+          },
+          {
+            ...provider({ provider: codex, instanceId: "codex_team" }),
+            models: [reasoningModel("gpt-5.4", "reasoningEffort")],
+          },
+        ],
+        threadModelSelection: createModelSelection(disabledCodex, "5.4", [
+          { id: "reasoningEffort", value: "xhigh" },
+        ]),
+      });
+
+      expect(state.selectedModel).toBe("gpt-5.4");
+      expect(traits.modelOptionsForDispatch).toBeUndefined();
+    });
+
     it("does not carry options through an alias that names another model per instance", () => {
       // "antigravity-default" is each Antigravity instance's current model.
       const antigravity = ProviderDriverKind.make("antigravity");
