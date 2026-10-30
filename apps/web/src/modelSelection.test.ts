@@ -923,6 +923,79 @@ describe("composer fallback to another instance of the same driver", () => {
     expect(traits.modelOptionsForDispatch).toBeUndefined();
   });
 
+  describe("with model aliases", () => {
+    const reasoningModel = (
+      slug: string,
+      id: string,
+      extra: Partial<ServerProvider["models"][number]> = {},
+    ): ServerProvider["models"][number] => ({
+      slug,
+      name: slug,
+      isCustom: false,
+      ...extra,
+      capabilities: {
+        optionDescriptors: [
+          {
+            id,
+            label: id,
+            type: "select",
+            options: ["medium", "high", "xhigh"].map((value) => ({
+              id: value,
+              label: value,
+              isDefault: value === "medium",
+            })),
+          },
+        ],
+      },
+    });
+
+    it("keeps the effort of a thread saved under a driver alias", () => {
+      const disabledCodex = ProviderInstanceId.make("codex");
+      const fallbackCodex = ProviderInstanceId.make("codex_team");
+      const models = [reasoningModel("gpt-5.4", "reasoningEffort")];
+      const { selectedInstanceId, state, traits } = composerFor({
+        providers: [
+          { ...provider({ provider: codex, instanceId: disabledCodex }), enabled: false, models },
+          { ...provider({ provider: codex, instanceId: fallbackCodex }), models },
+        ],
+        // "5.4" is the driver alias of gpt-5.4.
+        threadModelSelection: createModelSelection(disabledCodex, "5.4", [
+          { id: "reasoningEffort", value: "xhigh" },
+        ]),
+      });
+
+      expect(selectedInstanceId).toBe(fallbackCodex);
+      expect(state.selectedModel).toBe("gpt-5.4");
+      expect(traits.promptEffort).toBe("xhigh");
+    });
+
+    it("does not carry options through an alias that names another model per instance", () => {
+      // "antigravity-default" is each Antigravity instance's current model.
+      const antigravity = ProviderDriverKind.make("antigravity");
+      const disabledAntigravity = ProviderInstanceId.make("antigravity");
+      const current = { isDefault: true, aliases: [ANTIGRAVITY_DEFAULT_MODEL] };
+      const { state, traits } = composerFor({
+        providers: [
+          {
+            ...provider({ provider: antigravity, instanceId: disabledAntigravity }),
+            enabled: false,
+            models: [reasoningModel("gemini-3-pro", "thinking", current)],
+          },
+          {
+            ...provider({ provider: antigravity, instanceId: "antigravity_work" }),
+            models: [reasoningModel("claude-sonnet-4-6", "thinking", current)],
+          },
+        ],
+        threadModelSelection: createModelSelection(disabledAntigravity, ANTIGRAVITY_DEFAULT_MODEL, [
+          { id: "thinking", value: "high" },
+        ]),
+      });
+
+      expect(state.selectedModel).toBe("claude-sonnet-4-6");
+      expect(traits.modelOptionsForDispatch).toBeUndefined();
+    });
+  });
+
   it("does not carry options to another driver", () => {
     const codexOnly: ReadonlyArray<ServerProvider> = [
       {

@@ -1204,12 +1204,13 @@ function withFallbackInstanceOptions(input: {
     (provider) => provider.instanceId === requestedInstanceId,
   )?.driver;
   // The model of the selection the options came from, which can differ from the shown model's source.
+  // It can be a driver alias such as "5.4" for "gpt-5.4". Catalog aliases are not used: Antigravity's
+  // "antigravity-default" names a different model on each instance.
   const requestedModel = input.optionSelections?.[requestedInstanceId]?.model;
-  if (
-    !requestedOptions ||
-    requestedDriver !== input.selectedProvider ||
-    requestedModel !== input.selectedModel
-  ) {
+  const sameModel =
+    requestedModel === input.selectedModel ||
+    normalizeModelSlug(requestedModel, input.selectedProvider) === input.selectedModel;
+  if (!requestedOptions || requestedDriver !== input.selectedProvider || !sameModel) {
     return modelOptions;
   }
   return { ...modelOptions, [selectedInstanceId]: requestedOptions };
