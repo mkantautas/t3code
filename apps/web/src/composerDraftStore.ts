@@ -1208,19 +1208,22 @@ function withFallbackInstanceOptions(input: {
   const requestedProvider = input.providers.find(
     (provider) => provider.instanceId === requestedInstanceId,
   );
-  // A driver alias such as "5.4" expands only when the requested instance does not offer that exact
-  // slug; custom models count, from settings too, since an unavailable instance reports none.
-  // Catalog aliases are not used: Antigravity's "antigravity-default" differs per instance.
   const requestedModel = input.optionSelections?.[requestedInstanceId]?.model;
-  const requestedOffersSlug =
-    requestedProvider?.models.some((model) => model.slug === requestedModel) ||
-    readInstanceCustomModels(input.settings, requestedInstanceId, input.selectedProvider).some(
-      (model) => model.slug === requestedModel,
-    );
+  // Static aliases are shared across instances; exact custom slugs and catalog aliases are not.
+  const modelIdentity = (instanceId: ProviderInstanceId, model: string | undefined) => {
+    const isCustom =
+      input.providers
+        .find((provider) => provider.instanceId === instanceId)
+        ?.models.some((entry) => entry.slug === model && entry.isCustom) ||
+      readInstanceCustomModels(input.settings, instanceId, input.selectedProvider).some(
+        (entry) => entry.slug === model,
+      );
+    return isCustom ? model : normalizeModelSlug(model, input.selectedProvider);
+  };
   const sameModel =
     requestedModel === input.selectedModel ||
-    (!requestedOffersSlug &&
-      normalizeModelSlug(requestedModel, input.selectedProvider) === input.selectedModel);
+    modelIdentity(requestedInstanceId, requestedModel) ===
+      modelIdentity(selectedInstanceId, input.selectedModel);
   if (!requestedOptions || requestedProvider?.driver !== input.selectedProvider || !sameModel) {
     return modelOptions;
   }

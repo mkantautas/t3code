@@ -956,23 +956,26 @@ describe("composer fallback to another instance of the same driver", () => {
       },
     });
 
-    it("keeps the effort of a thread saved under a driver alias", () => {
+    it.each([
+      ["5.4", "gpt-5.4"],
+      ["gpt-5-codex", "gpt-5.4"],
+      ["gpt-5.4", "5.4"],
+    ])("keeps the effort from %s on fallback %s", (savedModel, fallbackModel) => {
       const disabledCodex = ProviderInstanceId.make("codex");
       const fallbackCodex = ProviderInstanceId.make("codex_team");
-      const models = [reasoningModel("gpt-5.4", "reasoningEffort")];
+      const models = [reasoningModel(fallbackModel, "reasoningEffort")];
       const { selectedInstanceId, state, traits } = composerFor({
         providers: [
           { ...provider({ provider: codex, instanceId: disabledCodex }), enabled: false, models },
           { ...provider({ provider: codex, instanceId: fallbackCodex }), models },
         ],
-        // "5.4" is the driver alias of gpt-5.4.
-        threadModelSelection: createModelSelection(disabledCodex, "5.4", [
+        threadModelSelection: createModelSelection(disabledCodex, savedModel, [
           { id: "reasoningEffort", value: "xhigh" },
         ]),
       });
 
       expect(selectedInstanceId).toBe(fallbackCodex);
-      expect(state.selectedModel).toBe("gpt-5.4");
+      expect(state.selectedModel).toBe(fallbackModel);
       expect(traits.promptEffort).toBe("xhigh");
     });
 
@@ -1012,6 +1015,25 @@ describe("composer fallback to another instance of the same driver", () => {
         expect(traits.modelOptionsForDispatch).toBeUndefined();
       },
     );
+
+    it("does not alias-expand the fallback instance's custom model", () => {
+      const { state, traits } = composerFor({
+        providers: [
+          { ...provider({ provider: codex, instanceId: "codex" }), enabled: false },
+          {
+            ...provider({ provider: codex, instanceId: "codex_team" }),
+            models: [reasoningModel("5.4", "reasoningEffort", { isCustom: true })],
+          },
+        ],
+        customModels: { codex_team: ["5.4"] },
+        threadModelSelection: createModelSelection(ProviderInstanceId.make("codex"), "gpt-5.4", [
+          { id: "reasoningEffort", value: "xhigh" },
+        ]),
+      });
+
+      expect(state.selectedModel).toBe("5.4");
+      expect(traits.modelOptionsForDispatch).toBeUndefined();
+    });
 
     it("does not carry options through an alias that names another model per instance", () => {
       // "antigravity-default" is each Antigravity instance's current model.
